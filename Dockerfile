@@ -35,6 +35,8 @@ WORKDIR /workspace
 # Environment variables
 ENV HOME=/home/coder
 ENV CLAUDE_CONFIG_DIR=/home/coder/.claude
+ENV TERM=xterm-256color
+ENV COLORTERM=truecolor
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["claude"]
