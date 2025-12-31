@@ -2,36 +2,244 @@
 
 Run [Claude Code](https://github.com/anthropics/claude-code) CLI in a Docker container. Claude Code is Anthropic's agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [Authentication](#authentication)
+  - [OAuth Login (For Subscription Users)](#oauth-login-for-subscription-users)
+  - [API Key (For API Credit Users)](#api-key-for-api-credit-users)
+- [Usage Examples](#usage-examples)
+  - [OAuth Usage Examples](#oauth-usage-examples)
+  - [API Key Usage Examples](#api-key-usage-examples)
+- [Configuration](#configuration)
+  - [Sharing Your Claude Configuration](#sharing-your-claude-configuration)
+  - [Using a Separate Docker Configuration](#using-a-separate-docker-configuration)
+- [Volume Mounts](#volume-mounts)
+- [Environment Variables](#environment-variables)
+- [MCP (Model Context Protocol) Support](#mcp-model-context-protocol-support)
+- [Troubleshooting](#troubleshooting)
+- [Shell Alias (Convenience)](#shell-alias-convenience)
+- [Building Locally](#building-locally)
+- [License](#license)
+- [Links](#links)
+
 ## Quick Start
 
+Most users have a Claude Pro or Max subscription and should use OAuth:
+
 ```bash
-# Pull and run (replace with your API key)
+# One-time login (opens browser)
+docker run -it --rm \
+  --network host \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude login
+
+# Then run normally (no API key needed!)
 docker run -it --rm \
   -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=your-key \
+  -v ~/.claude:/home/coder/.claude \
   ungb/claude-code
 ```
+
+If you're using API credits instead, see [API Key authentication](#api-key-for-api-credit-users).
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed
-- [Anthropic API key](https://console.anthropic.com/) or Claude account for OAuth
+- One of the following:
+  - Claude Pro or Max subscription (use [OAuth](#oauth-login-for-subscription-users))
+  - [Anthropic API key](https://console.anthropic.com/) with API credits (use [API Key](#api-key-for-api-credit-users))
 
-## Usage Examples
+## Authentication
 
-### Basic Interactive Session
+Choose your authentication method based on how you pay for Claude:
+
+| Plan Type | Authentication Method | Section |
+|-----------|----------------------|---------|
+| **Claude Pro/Max Subscription** | OAuth Login (recommended) | [OAuth Setup](#oauth-login-for-subscription-users) |
+| **API Credits (Pay-as-you-go)** | API Key | [API Key Setup](#api-key-for-api-credit-users) |
+
+### OAuth Login (For Subscription Users)
+
+**Recommended for most users.** If you have a Claude Pro or Max subscription, OAuth is the easiest way to authenticate.
+
+#### One-Time Setup
 
 ```bash
-# Start an interactive Claude Code session
+# Login with browser-based OAuth (one-time only)
+docker run -it --rm \
+  --network host \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude login
+```
+
+This opens your browser, authenticates with your Claude account, and saves tokens to `~/.claude/` on your host machine.
+
+#### Daily Usage
+
+After the one-time login, simply run:
+
+```bash
+# No API key needed!
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code
+```
+
+> **Important**: Always mount `-v ~/.claude:/home/coder/.claude` to persist your login. Without this mount, you'll need to login every time.
+
+**How it works**: OAuth tokens are stored in `~/.claude/` on your host. By mounting this directory, your credentials persist between container runs. You only need to run `claude login` once (or when tokens expire).
+
+### API Key (For API Credit Users)
+
+If you're using Anthropic API credits (pay-as-you-go), use an API key from [Anthropic Console](https://console.anthropic.com/):
+
+```bash
+# Set your API key as an environment variable
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  ungb/claude-code
+```
+
+Or use an environment variable from your shell:
+
+```bash
+# Export once in your shell
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Then use in docker commands
 docker run -it --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
 
-### One-Shot Commands (Non-Interactive)
+> **Note**: This method doesn't require mounting `~/.claude` for authentication (though you may still want to mount it for custom commands and settings).
+
+## Usage Examples
+
+### OAuth Usage Examples
+
+All examples below assume you've completed the [OAuth one-time setup](#one-time-setup).
+
+#### Interactive Session
+
+```bash
+# Start an interactive Claude Code session
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code
+```
+
+#### One-Shot Commands (Non-Interactive)
 
 Use the `-p` flag for non-interactive mode (prints result and exits):
+
+```bash
+# Ask a question about your codebase
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "explain the architecture of this project"
+
+# Generate code
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "create a REST API endpoint for user authentication"
+
+# Fix bugs
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "fix the failing tests in src/utils"
+
+# Code review
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "review the changes in the last commit"
+```
+
+#### Full Configuration (Recommended)
+
+```bash
+# Full setup with persistent config, git, and SSH
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/.ssh:/home/coder/.ssh:ro \
+  -v ~/.gitconfig:/home/coder/.gitconfig:ro \
+  ungb/claude-code
+```
+
+#### Using Docker Compose (OAuth)
+
+1. Copy `docker-compose.yml` to your project
+2. Ensure you've run `claude login` (one-time setup)
+3. Run:
+
+```bash
+# Interactive session
+docker compose run --rm claude
+
+# One-shot command (non-interactive)
+docker compose run --rm claude claude -p "explain this code"
+```
+
+#### Resume a Conversation
+
+```bash
+# Continue from where you left off
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude --resume
+```
+
+#### Piping Input
+
+```bash
+# Analyze a file
+cat README.md | docker run -i --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "summarize this document"
+
+# Analyze git diff
+git diff | docker run -i --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude -p "review these changes"
+```
+
+### API Key Usage Examples
+
+All examples below use the API key authentication method.
+
+#### Interactive Session
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code
+```
+
+#### One-Shot Commands (Non-Interactive)
 
 ```bash
 # Ask a question about your codebase
@@ -48,20 +256,6 @@ docker run -it --rm \
   ungb/claude-code \
   claude -p "create a REST API endpoint for user authentication"
 
-# Fix bugs
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude -p "fix the failing tests in src/utils"
-
-# Code review
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude -p "review the changes in the last commit"
-
 # JSON output (for scripts/automation)
 docker run -it --rm \
   -v $(pwd):/workspace \
@@ -70,38 +264,7 @@ docker run -it --rm \
   claude -p --output-format json "list all TODO comments"
 ```
 
-### Piping Input
-
-```bash
-# Analyze a file
-cat README.md | docker run -i --rm \
-  -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude -p "summarize this document"
-
-# Analyze git diff
-git diff | docker run -i --rm \
-  -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude -p "review these changes"
-```
-
-### With Full Configuration (Recommended)
-
-```bash
-# Full setup with persistent config, git, and SSH
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v ~/.claude:/home/coder/.claude \
-  -v ~/.ssh:/home/coder/.ssh:ro \
-  -v ~/.gitconfig:/home/coder/.gitconfig:ro \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code
-```
-
-### Using Docker Compose
+#### Using Docker Compose (API Key)
 
 1. Copy `docker-compose.yml` to your project:
 
@@ -125,19 +288,7 @@ docker compose run --rm claude
 docker compose run --rm claude claude -p "explain this code"
 ```
 
-### Resume a Conversation
-
-```bash
-# Continue from where you left off (requires persistent config)
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v ~/.claude:/home/coder/.claude \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude --resume
-```
-
-### Non-Interactive / CI Mode
+#### Non-Interactive / CI Mode
 
 ```bash
 # Run without interactive prompts (for scripts/CI)
@@ -155,11 +306,13 @@ docker run --rm \
   claude -p --dangerously-skip-permissions "run the linter and fix issues"
 ```
 
-## Sharing Your Claude Configuration
+## Configuration
+
+### Sharing Your Claude Configuration
 
 The `~/.claude` directory contains your personal Claude Code configuration including custom slash commands, skills, agents, and settings. Mount it to use your customizations inside the container.
 
-### What's in ~/.claude
+#### What's in ~/.claude
 
 ```
 ~/.claude/
@@ -174,10 +327,16 @@ The `~/.claude` directory contains your personal Claude Code configuration inclu
 └── .claude.json           # MCP server configurations
 ```
 
-### Mount Your Configuration
+#### Mount Your Configuration
 
 ```bash
-# Share your entire .claude folder (includes commands, agents, settings)
+# OAuth users: This is automatically included in OAuth setup
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code
+
+# API Key users: Add this mount to access your custom commands/agents
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
@@ -185,7 +344,7 @@ docker run -it --rm \
   ungb/claude-code
 ```
 
-### Use Custom Slash Commands
+#### Use Custom Slash Commands
 
 Once your `~/.claude` is mounted, your custom commands are available:
 
@@ -193,13 +352,12 @@ Once your `~/.claude` is mounted, your custom commands are available:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 
 # Then inside the session, type: /my-custom-command
 ```
 
-### Project-Specific Configuration
+#### Project-Specific Configuration
 
 Projects can have their own `.claude/` directory with project-specific commands:
 
@@ -208,9 +366,85 @@ Projects can have their own `.claude/` directory with project-specific commands:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
+
+### Using a Separate Docker Configuration
+
+If you want to use different Claude Code settings for Docker than your local setup (e.g., your local has MCP servers that won't work in Docker), you can create a separate configuration directory:
+
+#### Step 1: Create a Docker-Specific Config Directory
+
+```bash
+# Create a separate config directory for Docker
+mkdir -p ~/.claude-docker
+
+# Copy your existing config if you want to start from there
+cp -r ~/.claude/* ~/.claude-docker/
+
+# Or start fresh - Claude will create default settings on first run
+```
+
+#### Step 2: Mount the Docker-Specific Config
+
+```bash
+# OAuth login with Docker-specific config
+docker run -it --rm \
+  --network host \
+  -v ~/.claude-docker:/home/coder/.claude \
+  ungb/claude-code \
+  claude login
+
+# Use the Docker-specific config
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude-docker:/home/coder/.claude \
+  ungb/claude-code
+```
+
+#### Step 3: Customize Your Docker Config
+
+Edit `~/.claude-docker/settings.json` or `.claude.json` on your host to:
+- Remove MCP servers that don't work in Docker
+- Add Docker-specific slash commands
+- Adjust settings for containerized environment
+- Configure different agents or hooks
+
+#### Example: Docker-Specific Settings
+
+```bash
+# Edit your Docker-specific settings
+nano ~/.claude-docker/settings.json
+
+# Remove problematic MCP servers
+nano ~/.claude-docker/.claude.json
+```
+
+This approach keeps your local Claude Code setup separate from your Docker setup, allowing each to have their own:
+- MCP server configurations
+- Custom commands and agents
+- Settings and preferences
+- OAuth credentials (if using different accounts)
+
+## Volume Mounts
+
+| Mount | Purpose |
+|-------|---------|
+| `/workspace` | Your project directory (required) |
+| `/home/coder/.claude` | Claude config, commands, agents, settings, OAuth tokens |
+| `/home/coder/.ssh` | SSH keys for git operations (read-only) |
+| `/home/coder/.gitconfig` | Git configuration (read-only) |
+| `/home/coder/.claude.json` | MCP server configurations (read-only) |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Conditional* | Your Anthropic API key |
+| `ANTHROPIC_API_BASE_URL` | No | Custom API endpoint (for proxies) |
+| `CLAUDE_CONFIG_DIR` | No | Override config directory location |
+
+*Required if using API key authentication. Not required if using OAuth.
 
 ## MCP (Model Context Protocol) Support
 
@@ -245,7 +479,6 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
   -v ~/.claude.json:/home/coder/.claude.json:ro \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
 
@@ -276,24 +509,13 @@ Full MCP support in Docker containers requires further investigation:
 
 If you have insights or solutions for MCP in Docker, please open an issue or PR!
 
-## Authentication
+## Troubleshooting
 
-### Option 1: API Key (Recommended for Docker)
+### OAuth Login Not Working
 
-Get an API key from [Anthropic Console](https://console.anthropic.com/):
-
-```bash
--e ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### Option 2: OAuth Login
-
-OAuth login is a two-step process:
-
-**Step 1: Login (once)**
+Use `--network host` to allow the OAuth callback:
 
 ```bash
-# Login with browser-based OAuth (requires host network for callback)
 docker run -it --rm \
   --network host \
   -v ~/.claude:/home/coder/.claude \
@@ -301,68 +523,19 @@ docker run -it --rm \
   claude login
 ```
 
-This opens a browser, authenticates, and saves tokens to `~/.claude/`.
+### OAuth Login Not Persisting (Need to Login Every Time)
 
-**Step 2: Use normally**
-
-```bash
-# Now run without API key - tokens are in ~/.claude
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v ~/.claude:/home/coder/.claude \
-  ungb/claude-code
-```
-
-> **Note**: Mount `~/.claude` from your host so tokens persist between container runs.
-
-## Volume Mounts
-
-| Mount | Purpose |
-|-------|---------|
-| `/workspace` | Your project directory (required) |
-| `/home/coder/.claude` | Claude config, commands, agents, settings |
-| `/home/coder/.ssh` | SSH keys for git operations (read-only) |
-| `/home/coder/.gitconfig` | Git configuration (read-only) |
-| `/home/coder/.claude.json` | MCP server configurations (read-only) |
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes* | Your Anthropic API key |
-| `ANTHROPIC_API_BASE_URL` | No | Custom API endpoint (for proxies) |
-| `CLAUDE_CONFIG_DIR` | No | Override config directory location |
-
-*Required unless using OAuth login
-
-## Utility Commands
+You must mount `~/.claude` to persist OAuth tokens between container runs:
 
 ```bash
-# Check version
-docker run --rm ungb/claude-code claude --version
-
-# Run health check
-docker run --rm \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude doctor
-
-# List available commands
-docker run --rm \
-  -v ~/.claude:/home/coder/.claude \
-  ungb/claude-code \
-  claude /help
+# Always include this mount for OAuth persistence
+-v ~/.claude:/home/coder/.claude
 ```
 
-## Building Locally
-
-```bash
-git clone https://github.com/ungb/claude-code-docker.git
-cd claude-code-docker
-docker build -t claude-code .
-```
-
-## Troubleshooting
+If you're still being prompted to login:
+1. Verify the mount exists: `ls -la ~/.claude/`
+2. Check for credential files: `ls ~/.claude/*.json 2>/dev/null`
+3. Ensure you ran `claude login` with the same mount path
 
 ### Permission Denied on Mounted Files
 
@@ -373,7 +546,6 @@ The container runs as user `coder` (UID 1000). If you have permission issues:
 docker run -it --rm \
   --user $(id -u):$(id -g) \
   -v $(pwd):/workspace \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
 
@@ -386,7 +558,6 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.ssh:/home/coder/.ssh:ro \
   -v ~/.gitconfig:/home/coder/.gitconfig:ro \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
 
@@ -398,26 +569,53 @@ Make sure you're mounting your `~/.claude` directory:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code
 ```
 
-### OAuth Login Not Working
-
-Use `--network host` to allow the OAuth callback:
+### Utility Commands
 
 ```bash
-docker run -it --rm \
-  --network host \
-  -v $(pwd):/workspace \
+# Check version
+docker run --rm ungb/claude-code claude --version
+
+# Run health check (OAuth)
+docker run --rm \
   -v ~/.claude:/home/coder/.claude \
   ungb/claude-code \
-  claude login
+  claude doctor
+
+# Run health check (API Key)
+docker run --rm \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code \
+  claude doctor
+
+# List available commands
+docker run --rm \
+  -v ~/.claude:/home/coder/.claude \
+  ungb/claude-code \
+  claude /help
 ```
 
 ## Shell Alias (Convenience)
 
 Add to your `~/.bashrc` or `~/.zshrc`:
+
+### For OAuth Users
+
+```bash
+alias claude-docker='docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/.ssh:/home/coder/.ssh:ro \
+  -v ~/.gitconfig:/home/coder/.gitconfig:ro \
+  ungb/claude-code claude'
+
+# Usage (interactive): claude-docker
+# Usage (one-shot):    claude-docker -p "explain this code"
+```
+
+### For API Key Users
 
 ```bash
 alias claude-docker='docker run -it --rm \
@@ -430,6 +628,14 @@ alias claude-docker='docker run -it --rm \
 
 # Usage (interactive): claude-docker
 # Usage (one-shot):    claude-docker -p "explain this code"
+```
+
+## Building Locally
+
+```bash
+git clone https://github.com/ungb/claude-code-docker.git
+cd claude-code-docker
+docker build -t claude-code .
 ```
 
 ## License
