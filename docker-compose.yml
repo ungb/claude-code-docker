@@ -4,21 +4,41 @@ services:
     build: .
     container_name: claude-code
     volumes:
-      # Mount your project directory
-      - ./workspace:/workspace
-      # Persist Claude configuration between runs
-      - claude-config:/home/coder/.claude
+      # Mount your project directory (or use ./workspace)
+      - .:/workspace
+      # Share your host's Claude config (commands, agents, settings, OAuth tokens)
+      - ~/.claude:/home/coder/.claude
       # SSH keys for git operations (read-only)
       - ~/.ssh:/home/coder/.ssh:ro
       # Git configuration (read-only)
       - ~/.gitconfig:/home/coder/.gitconfig:ro
     environment:
-      # Set your Anthropic API key
+      # Set your Anthropic API key (not needed if using OAuth)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    # Uncomment for OAuth login or MCP servers
+    # network_mode: host
+
+  # Alternative: Use named volume instead of host mount
+  # Useful if you don't have existing ~/.claude config
+  claude-fresh:
+    image: ungb/claude-code:latest
+    build: .
+    container_name: claude-code-fresh
+    volumes:
+      - .:/workspace
+      - claude-config:/home/coder/.claude
+      - ~/.ssh:/home/coder/.ssh:ro
+      - ~/.gitconfig:/home/coder/.gitconfig:ro
+    environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     stdin_open: true
     tty: true
-    # Uncomment for host network mode (useful for some integrations)
-    # network_mode: host
+    working_dir: /workspace
+    profiles:
+      - fresh
 
 volumes:
   claude-config:
