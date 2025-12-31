@@ -29,7 +29,9 @@ docker run -it --rm \
   ungb/claude-code
 ```
 
-### One-Shot Commands
+### One-Shot Commands (Non-Interactive)
+
+Use the `-p` flag for non-interactive mode (prints result and exits):
 
 ```bash
 # Ask a question about your codebase
@@ -37,28 +39,53 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code \
-  claude "explain the architecture of this project"
+  claude -p "explain the architecture of this project"
 
 # Generate code
 docker run -it --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code \
-  claude "create a REST API endpoint for user authentication"
+  claude -p "create a REST API endpoint for user authentication"
 
 # Fix bugs
 docker run -it --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code \
-  claude "fix the failing tests in src/utils"
+  claude -p "fix the failing tests in src/utils"
 
 # Code review
 docker run -it --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code \
-  claude "review the changes in the last commit"
+  claude -p "review the changes in the last commit"
+
+# JSON output (for scripts/automation)
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code \
+  claude -p --output-format json "list all TODO comments"
+```
+
+### Piping Input
+
+```bash
+# Analyze a file
+cat README.md | docker run -i --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code \
+  claude -p "summarize this document"
+
+# Analyze git diff
+git diff | docker run -i --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code \
+  claude -p "review these changes"
 ```
 
 ### With Full Configuration (Recommended)
@@ -94,8 +121,8 @@ echo "ANTHROPIC_API_KEY=your-key-here" > .env
 # Interactive session
 docker compose run --rm claude
 
-# One-shot command
-docker compose run --rm claude claude "explain this code"
+# One-shot command (non-interactive)
+docker compose run --rm claude claude -p "explain this code"
 ```
 
 ### Resume a Conversation
@@ -113,12 +140,19 @@ docker run -it --rm \
 ### Non-Interactive / CI Mode
 
 ```bash
-# Run without prompts (for scripts/CI)
-docker run -it --rm \
+# Run without interactive prompts (for scripts/CI)
+docker run --rm \
   -v $(pwd):/workspace \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code \
-  claude --yes "format all TypeScript files"
+  claude -p --allowedTools "Bash(npm run format)" "format all TypeScript files"
+
+# Skip all permission prompts (use with caution!)
+docker run --rm \
+  -v $(pwd):/workspace \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  ungb/claude-code \
+  claude -p --dangerously-skip-permissions "run the linter and fix issues"
 ```
 
 ## Sharing Your Claude Configuration
@@ -160,8 +194,9 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  ungb/claude-code \
-  claude "/my-custom-command"
+  ungb/claude-code
+
+# Then inside the session, type: /my-custom-command
 ```
 
 ### Project-Specific Configuration
@@ -393,7 +428,8 @@ alias claude-docker='docker run -it --rm \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code claude'
 
-# Usage: claude-docker "explain this code"
+# Usage (interactive): claude-docker
+# Usage (one-shot):    claude-docker -p "explain this code"
 ```
 
 ## License
