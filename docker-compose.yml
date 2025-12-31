@@ -1,0 +1,25 @@
+services:
+  claude:
+    image: ungb/claude-code:latest
+    build: .
+    container_name: claude-code
+    volumes:
+      # Mount your project directory
+      - ./workspace:/workspace
+      # Persist Claude configuration between runs
+      - claude-config:/home/coder/.claude
+      # SSH keys for git operations (read-only)
+      - ~/.ssh:/home/coder/.ssh:ro
+      # Git configuration (read-only)
+      - ~/.gitconfig:/home/coder/.gitconfig:ro
+    environment:
+      # Set your Anthropic API key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    stdin_open: true
+    tty: true
+    # Uncomment for host network mode (useful for some integrations)
+    # network_mode: host
+
+volumes:
+  claude-config:
+    name: claude-code-config
