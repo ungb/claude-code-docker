@@ -16,6 +16,7 @@ Run [Claude Code](https://github.com/anthropics/claude-code) CLI in a Docker con
   - [Sharing Your Claude Configuration](#sharing-your-claude-configuration)
   - [Using a Separate Docker Configuration](#using-a-separate-docker-configuration)
 - [Volume Mounts](#volume-mounts)
+- [Working with External Files and Screenshots](#working-with-external-files-and-screenshots)
 - [Environment Variables](#environment-variables)
 - [MCP (Model Context Protocol) Support](#mcp-model-context-protocol-support)
 - [Troubleshooting](#troubleshooting)
@@ -174,12 +175,13 @@ docker run -it --rm \
 #### Full Configuration (Recommended)
 
 ```bash
-# Full setup with persistent config, git, and SSH
+# Full setup with persistent config, git, SSH, and screenshots
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.claude:/home/coder/.claude \
   -v ~/.ssh:/home/coder/.ssh:ro \
   -v ~/.gitconfig:/home/coder/.gitconfig:ro \
+  -v ~/claude-screenshots:/screenshots \
   ungb/claude-code
 ```
 
@@ -435,6 +437,139 @@ This approach keeps your local Claude Code setup separate from your Docker setup
 | `/home/coder/.ssh` | SSH keys for git operations (read-only) |
 | `/home/coder/.gitconfig` | Git configuration (read-only) |
 | `/home/coder/.claude.json` | MCP server configurations (read-only) |
+| `/screenshots` | Optional: Dedicated folder for screenshots and images (recommended) |
+
+## Working with External Files and Screenshots
+
+**Important**: Drag-and-drop doesn't work when Claude Code runs in a Docker container because it's isolated from your host filesystem. You need to explicitly mount directories to make files accessible.
+
+### Recommended Setup: Dedicated Screenshots Folder
+
+Create a dedicated folder on your host machine for screenshots and images you want to share with Claude Code:
+
+#### Step 1: Create the Screenshots Directory
+
+```bash
+# Create a dedicated screenshots folder
+mkdir -p ~/claude-screenshots
+```
+
+#### Step 2: Mount the Screenshots Folder
+
+**Using docker run:**
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/claude-screenshots:/screenshots \
+  ungb/claude-code
+```
+
+**Using docker-compose:**
+
+Update your `docker-compose.yml` to include the screenshots mount (see example in the repository).
+
+#### Step 3: Add Your Files
+
+```bash
+# Copy screenshots or images to the folder
+cp ~/Downloads/screenshot.png ~/claude-screenshots/
+cp ~/Desktop/diagram.jpg ~/claude-screenshots/
+
+# Or save screenshots directly to this folder using your screenshot tool
+```
+
+#### Step 4: Reference Files in Claude Code
+
+Inside Claude Code, reference files using the mounted path:
+
+```
+Can you analyze /screenshots/screenshot.png?
+```
+
+```
+Please review the UI in /screenshots/mockup.png and suggest improvements
+```
+
+```
+Read the diagram at /screenshots/architecture.jpg and explain the flow
+```
+
+### Alternative: Using Your Downloads Folder
+
+You can also mount your Downloads folder directly:
+
+```bash
+# Mount Downloads folder (read-only recommended for safety)
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/Downloads:/downloads:ro \
+  ungb/claude-code
+```
+
+Then reference files:
+
+```
+Analyze /downloads/screenshot.png
+```
+
+### Alternative: Copy Files to Your Workspace
+
+If you're working on a specific project, copy files directly into your project directory:
+
+```bash
+# Copy to your project directory (which is already mounted as /workspace)
+cp ~/Downloads/screenshot.png /path/to/your/project/
+
+# Then in Claude Code:
+# Analyze /workspace/screenshot.png
+```
+
+### Multiple Mount Points Example
+
+You can mount multiple directories for different purposes:
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/claude-screenshots:/screenshots \
+  -v ~/Downloads:/downloads:ro \
+  -v ~/Documents:/docs:ro \
+  ungb/claude-code
+```
+
+This gives you access to:
+- `/workspace` - Your current project
+- `/screenshots` - Dedicated screenshots folder (read-write)
+- `/downloads` - Downloads folder (read-only)
+- `/docs` - Documents folder (read-only)
+
+### Tips for Working with External Files
+
+1. **Use descriptive paths**: Instead of `screenshot.png`, use `login-page-error.png`
+2. **Organize by purpose**: Create subfolders in `~/claude-screenshots/` like `bugs/`, `designs/`, `diagrams/`
+3. **Read-only mounts**: Use `:ro` flag for folders you only need to read from (safety measure)
+4. **Absolute paths**: Always use absolute paths when referencing files (e.g., `/screenshots/image.png`)
+
+### Example Workflow
+
+```bash
+# 1. Take a screenshot (macOS example)
+# Press Cmd+Shift+4 and save to ~/claude-screenshots/
+
+# 2. Start Claude Code with screenshots mounted
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.claude:/home/coder/.claude \
+  -v ~/claude-screenshots:/screenshots \
+  ungb/claude-code
+
+# 3. In Claude Code, reference the screenshot
+> Can you analyze the error message in /screenshots/error-screenshot.png and help me fix it?
+```
 
 ## Environment Variables
 
@@ -609,10 +744,12 @@ alias claude-docker='docker run -it --rm \
   -v ~/.claude:/home/coder/.claude \
   -v ~/.ssh:/home/coder/.ssh:ro \
   -v ~/.gitconfig:/home/coder/.gitconfig:ro \
+  -v ~/claude-screenshots:/screenshots \
   ungb/claude-code claude'
 
 # Usage (interactive): claude-docker
 # Usage (one-shot):    claude-docker -p "explain this code"
+# Usage (with screenshot): claude-docker -p "analyze /screenshots/bug.png"
 ```
 
 ### For API Key Users
@@ -623,11 +760,13 @@ alias claude-docker='docker run -it --rm \
   -v ~/.claude:/home/coder/.claude \
   -v ~/.ssh:/home/coder/.ssh:ro \
   -v ~/.gitconfig:/home/coder/.gitconfig:ro \
+  -v ~/claude-screenshots:/screenshots \
   -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
   ungb/claude-code claude'
 
 # Usage (interactive): claude-docker
 # Usage (one-shot):    claude-docker -p "explain this code"
+# Usage (with screenshot): claude-docker -p "analyze /screenshots/bug.png"
 ```
 
 ## Building Locally

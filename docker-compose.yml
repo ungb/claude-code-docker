@@ -12,6 +12,8 @@ services:
       - ~/.ssh:/home/coder/.ssh:ro
       # Git configuration (read-only)
       - ~/.gitconfig:/home/coder/.gitconfig:ro
+      # Dedicated folder for screenshots and images (recommended)
+      - ~/claude-screenshots:/screenshots
     environment:
       # Set your Anthropic API key (not needed if using OAuth)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -32,6 +34,7 @@ services:
       - claude-config:/home/coder/.claude
       - ~/.ssh:/home/coder/.ssh:ro
       - ~/.gitconfig:/home/coder/.gitconfig:ro
+      - ~/claude-screenshots:/screenshots
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     stdin_open: true
